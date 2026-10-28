@@ -302,9 +302,9 @@ function colorGrid(n, sol, colors){
     }
     if(!done) grid[es[0][0]][es[0][1]]=colors[rInt(colors.length)];
   }
-  /* 保证每种颜色至少2格：从相邻的较大区域借一格（保持连通） */
+  /* 保证每种颜色至少3格：从相邻的较大区域逐格借入（保持连通） */
   for(const ci of colors){
-    while(cellsOfColor(n,grid,ci).length<2){
+    while(cellsOfColor(n,grid,ci).length<3){
       let moved=false;
       for(const [r,c] of cellsOfColor(n,grid,ci)){
         for(const [dr,dc] of [[1,0],[-1,0],[0,1],[0,-1]]){
@@ -312,7 +312,7 @@ function colorGrid(n, sol, colors){
           if(rr<0||rr>=n||cc2<0||cc2>=n) continue;
           const cj=grid[rr][cc2];
           if(cj===ci) continue;
-          if(cellsOfColor(n,grid,cj).length>2){ grid[rr][cc2]=ci; moved=true; break; }
+          if(cellsOfColor(n,grid,cj).length>3){ grid[rr][cc2]=ci; moved=true; break; }
         }
         if(moved) break;
       }
@@ -322,9 +322,9 @@ function colorGrid(n, sol, colors){
   return grid;
 }
 
-/* 合法染色：各颜色区域4-连通 且 每色至少2格 */
+/* 合法染色：各颜色区域4-连通 且 每色至少3格 */
 function validColoring(n,grid,colors){
-  for(const ci of colors) if(cellsOfColor(n,grid,ci).length<2) return false;
+  for(const ci of colors) if(cellsOfColor(n,grid,ci).length<3) return false;
   return regionsConnected(n,grid,colors);
 }
 
@@ -567,13 +567,13 @@ function stripeLevel(n){
   return null;
 }
 
-/* ---------- 关卡生成（唯一解 + 可单步推出 + 每色至少2格） ---------- */
+/* ---------- 关卡生成（唯一解 + 可单步推出 + 每色至少3格） ---------- */
 function generateLevel(n){
   /* 主路径：纯色列构造（毫秒级、唯一解率高） */
   const st=stripeLevel(n);
   if(st) return st;
   /* 兜底：随机生长染色 + 唯一性修正（预算按 n 分档，8x8 给足） */
-  const budget = n>=8 ? 10000 : 3000;
+  const budget = 5000;  // 5x5~7x7 统一预算，保证秒级生成
   const t0=Date.now();
   for(let attempt=0; attempt<60000; attempt++){
     if(Date.now()-t0>budget) break;
@@ -636,11 +636,12 @@ function fmt(sec){ const m=Math.floor(sec/60), s=sec%60; return String(m).padSta
 
 /* ---------- 关卡流程 ---------- */
 function startLevel(){
-  const lv=generateLevel(S.n);
-  if(!lv){ alert('生成失败，请刷新重试'); return; }
+  let lv=null;
+  for(let i=0;i<3 && !lv;i++) lv=generateLevel(S.n); // 偶发失败自动重试
+  if(!lv){ alert('本关生成较难，请刷新重试'); return; }
   S.grid=lv.grid; S.solCols=lv.solCols; S.solPos=lv.solPos;
   S.marks.clear(); S.horseColor.clear();
-  S.timeLimit=120+50*(S.n-5); S.timeLeft=S.timeLimit; S.elapsed=0;  // 5x5=120s ... 8x8=270s
+  S.timeLimit=120+55*(S.n-5); S.timeLeft=S.timeLimit; S.elapsed=0;  // 5x5=120s ... 7x7=230s
   S.hearts=3; S.paused=false; S.over=false;
   $('btnPause').textContent='⏸ 暂时';
   renderHorseList(); renderBoard(); updateHUD();
@@ -655,7 +656,7 @@ function restartLevel(){
 }
 function nextLevel(){
   S.level++; save.level=Math.max(save.level,S.level); persist();
-  S.n=5+rInt(4); hideModal(); startLevel();  // 5x5 ~ 8x8
+  S.n=5+rInt(3); hideModal(); startLevel();  // 5x5 ~ 7x7
 }
 function win(){
   S.over=true;
@@ -899,7 +900,7 @@ function init(){
   boardEl=$('board');
   loadSave();
   S.level=save.level||1;
-  S.n=5+rInt(4);  // 5x5 ~ 8x8
+  S.n=5+rInt(3);  // 5x5 ~ 7x7
   if(save.colorblind) document.body.classList.add('cb');
   applyCollapsed();
   bindUI();
